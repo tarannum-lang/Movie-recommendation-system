@@ -2,23 +2,40 @@ import streamlit as st
 import pickle
 import pandas as pd
 import requests
+import os
+import gdown
 from config import api_key
 
-# -------------------- LOAD DATA --------------------
+# -------------------- DOWNLOAD MODEL IF NOT EXISTS --------------------
 
-movies = pickle.load(open('movies.pkl', 'rb'))
-similarity = pickle.load(open('similarity.pkl', 'rb'))
+def download_similarity():
+    if not os.path.exists("similarity.pkl"):
+        file_id = "1evKSGLmSW4HhFed9K5WeqK7_k_AFXXN9"   # 🔴 PUT YOUR FILE ID HERE
+        url = f"https://drive.google.com/uc?id={file_id}"
+        gdown.download(url, "similarity.pkl", quiet=False)
 
-# Ensure movies is a DataFrame
-if not isinstance(movies, pd.DataFrame):
-    movies = pd.DataFrame(movies)
+# -------------------- LOAD DATA (CACHED) --------------------
+
+@st.cache_resource
+def load_data():
+    download_similarity()
+
+    movies = pickle.load(open("movies.pkl", "rb"))
+    similarity = pickle.load(open("similarity.pkl", "rb"))
+
+    if not isinstance(movies, pd.DataFrame):
+        movies = pd.DataFrame(movies)
+
+    return movies, similarity
+
+movies, similarity = load_data()
 
 # -------------------- TMDB POSTER FUNCTION --------------------
 
 def fetch_poster(movie_id):
     url = f"https://api.themoviedb.org/3/movie/{movie_id}?api_key={api_key}"
     data = requests.get(url).json()
-    poster_path = data.get('poster_path')
+    poster_path = data.get("poster_path")
 
     if poster_path:
         return "https://image.tmdb.org/t/p/w500/" + poster_path
@@ -28,10 +45,10 @@ def fetch_poster(movie_id):
 # -------------------- RECOMMENDER FUNCTION --------------------
 
 def recommend(movie):
-    if movie not in movies['title'].values:
+    if movie not in movies["title"].values:
         return [], []
 
-    index = movies[movies['title'] == movie].index[0]
+    index = movies[movies["title"] == movie].index[0]
     distances = similarity[index]
 
     movie_list = sorted(
@@ -58,7 +75,7 @@ st.title("🎥 Movie Recommender System")
 
 selected_movie = st.selectbox(
     "Select a movie",
-    movies['title'].values
+    movies["title"].values
 )
 
 if st.button("Recommend"):
